@@ -10,7 +10,7 @@ mkdir -p config/{environments,initializers,locales} db lib log public test/{cont
 mkdir -p config/environments
 
 # Adiciona arquivos .keep em todos os diretórios relevantes
-find app config db lib log public test tmp  -type d -exec touch {}/.keep \;
+find app db lib log public test tmp  -type d -exec touch {}/.keep \;
 
 # Cria o arquivo composer.json na raiz do projeto
 cat <<EOF > composer.json
