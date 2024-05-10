@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Cria os diretórios principais
+mkdir -p app/{models,controllers,views,helpers,mailers,jobs}
+mkdir -p config/{environments,initializers,locales} db lib log public test/{controllers,models,integration,fixtures} tmp vendor
+
+# Cria subdiretórios em 'config'
+mkdir -p config/environments
+
+# Adiciona arquivos .keep em todos os diretórios relevantes
+find app config db lib log public test tmp vendor -type d -exec touch {}/.keep \;
