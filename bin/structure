@@ -4,13 +4,13 @@
 mkdir -p app/{models,controllers,views,helpers,mailers,jobs}
 mkdir -p app/controllers/traits
 mkdir -p app/models/traits
-mkdir -p config/{environments,initializers,locales} db lib log public test/{controllers,models,integration,fixtures} tmp vendor
+mkdir -p config/{environments,initializers,locales} db lib log public test/{controllers,models,integration,fixtures} tmp
 
 # Cria subdiretórios em 'config'
 mkdir -p config/environments
 
 # Adiciona arquivos .keep em todos os diretórios relevantes
-find app config db lib log public test tmp vendor -type d -exec touch {}/.keep \;
+find app config db lib log public test tmp  -type d -exec touch {}/.keep \;
 
 # Cria o arquivo composer.json na raiz do projeto
 cat <<EOF > composer.json
@@ -48,6 +48,9 @@ cat <<EOF > composer.json
     "post-update-cmd": [
       "@composer dump-autoload -o"
     ]
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.1"
   }
 }
 EOF
@@ -55,31 +58,47 @@ EOF
 # Cria o arquivo init.php para configurar o Slim App
 cat <<EOF > init.php
 <?php
-
 use Slim\Factory\AppFactory;
-
 require "vendor/autoload.php";
-
 \$app = AppFactory::create();
-
 // Add Error Handling Middleware
 \$app->addErrorMiddleware(true, true, true);
-
+require "config/routes.php";
 EOF
 
 # Cria o arquivo public/index.php que define a rota inicial
 cat <<EOF > public/index.php
 <?php
-
 require "../init.php";
+\$app->run();
+EOF
 
+# Cria o arquivo config/routes.php com uma rota de exemplo
+cat <<EOF > config/routes.php
+<?php
+// Home
 \$app->get('/', function (\$request, \$response, \$args) {
   \$response->getBody()->write("Home");
   return \$response;
 });
+EOF
 
-\$app->run();
-
+# Cria o arquivo phpunit.xml na raiz do projeto
+cat <<EOF > phpunit.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="vendor/autoload.php"
+         colors="true">
+    <testsuites>
+        <testsuite name="Application Test Suite">
+            <directory suffix=".php">test</directory>
+        </testsuite>
+    </testsuites>
+    <filter>
+        <whitelist>
+            <directory suffix=".php">app</directory>
+        </whitelist>
+    </filter>
+</phpunit>
 EOF
 
 # Instala as dependências e cria o autoload.php na pasta vendor
