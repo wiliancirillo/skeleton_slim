@@ -76,11 +76,11 @@ class HomeController extends ApplicationController
 EOF
 
 cat <<EOF > app/views/home/index.html
-{\% extends "layouts/application.html" \%}
+{% extends "layouts/application.html" %}
 
-{\% block content \%}
+{% block content %}
 Conteúdo aqui!
-{\% endblock \%}
+{% endblock %}
 EOF
 
 cat <<EOF > app/views/layouts/application.html
@@ -92,7 +92,7 @@ cat <<EOF > app/views/layouts/application.html
     <title>{{ site_title }}</title>
   </head>
   <body>
-    {\% block content %}{% endblock \%}
+    {% block content %}{% endblock %}
   </body>
 </html>
 EOF
@@ -275,7 +275,6 @@ trait Views
 EOF
 
 cat <<EOF > app/controllers/ApplicationController.php
-
 <?php
 
 namespace App\\Controllers;
