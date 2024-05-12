@@ -1,16 +1,15 @@
 #!/bin/bash
 
 # Cria os diretórios principais
-mkdir -p app/{models,controllers,views,helpers,mailers,jobs}
+mkdir -p app/{models,controllers,helpers,mailers,jobs}
+mkdir -p app/views/{home,layouts,shared}
 mkdir -p app/controllers/traits
 mkdir -p app/models/traits
-mkdir -p config/{environments,initializers,locales} db lib log public test/{controllers,models,integration,fixtures} tmp
-
-# Cria subdiretórios em 'config'
-mkdir -p config/environments
+mkdir -p config/{environments,initializers,locales} db lib log public tests/{controllers,models,integration,fixtures} tmp/cache
+mkdir -p db/{migrations,seeds}
 
 # Adiciona arquivos .keep em todos os diretórios relevantes
-find app db lib log public test tmp  -type d -exec touch {}/.keep \;
+find app db/{migrations,seeds} lib log tests tmp/cache app/views/shared -type d \( ! -path 'app/controllers/*' -and ! -name 'controllers' \) -exec touch {}/.keep \;
 
 # Cria o arquivo composer.json na raiz do projeto
 cat <<EOF > composer.json
@@ -18,7 +17,8 @@ cat <<EOF > composer.json
   "require": {
     "slim/slim": "^4.0",
     "slim/twig-view": "^3.4",
-    "slim/psr7": "^1.6"
+    "slim/psr7": "^1.6",
+    "vlucas/phpdotenv": "^5.6"
   },
   "autoload": {
     "psr-4": {
@@ -35,7 +35,7 @@ cat <<EOF > composer.json
   },
   "autoload-dev": {
     "psr-4": {
-      "Tests\\\\": "test/"
+      "tests\\\\": "tests/"
     }
   },
   "config": {
@@ -55,44 +55,156 @@ cat <<EOF > composer.json
 }
 EOF
 
+cat <<EOF > app/controllers/HomeController.php
+<?php
+
+namespace App\\Controllers;
+
+class HomeController extends ApplicationController
+{
+    public function index(\$request, \$response, \$args)
+    {
+        return \$this->getTemplateEngine()->render(
+            \$response,
+            \$this->setTemplateView(),
+            [
+                'site_title' => 'Base Structure'
+            ]
+        );
+    }
+}
+EOF
+
+cat <<EOF > app/views/home/index.html
+{\% extends "layouts/application.html" \%}
+
+{\% block content \%}
+Conteúdo aqui!
+{\% endblock \%}
+EOF
+
+cat <<EOF > app/views/layouts/application.html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ site_title }}</title>
+  </head>
+  <body>
+    {\% block content %}{% endblock \%}
+  </body>
+</html>
+EOF
+
+
+
 # Cria o arquivo init.php para configurar o Slim App
 cat <<EOF > init.php
 <?php
-use Slim\Factory\AppFactory;
-require "vendor/autoload.php";
+
+/*
+\ * Path: /init.php
+\ * Boostrap of the project
+\ */
+
+use Slim\\Factory\\AppFactory;
+use Illuminate\\Database\\Capsule\\Manager as Capsule;
+
+require 'vendor/autoload.php';
+
+// Carregar variáveis de ambiente
+\$dotenv = Dotenv\\Dotenv::createImmutable(__DIR__);
+\$dotenv->load();
+
 \$app = AppFactory::create();
 // Add Error Handling Middleware
 \$app->addErrorMiddleware(true, true, true);
-require "config/routes.php";
+
+// Carrega todos os arquivos de inicialização
+\$initializersPath = __DIR__ . '/config/initializers/';
+if (is_dir(\$initializersPath)) {
+    \$initializerFiles = new DirectoryIterator(\$initializersPath);
+    foreach (\$initializerFiles as \$file) {
+        if (\$file->isFile() && \$file->getExtension() === 'php') {
+            require_once \$file->getPathname();
+        }
+    }
+}
+
+// Inicia o Eloquent ORM
+\$config = require 'config/database.php';
+//\$capsule = new Capsule();
+//\$capsule->addConnection(\$config);
+//\$capsule->setAsGlobal();
+//\$capsule->bootEloquent();
+
+// Carrega as rotas
+require 'config/routes.php';
+EOF
+
+cat <<EOF > config/database.php
+<?php
+
+return [
+    'driver' => DB_DRIVER,
+    'host' => DB_HOST,
+    'database' => DB_DATABASE,
+    'username' => DB_USERNAME,
+    'password' => DB_PASSWORD,
+    'charset' => DB_CHARSET,
+    'collation' => 'utf8_unicode_ci',
+    'prefix' => '',
+];
+EOF
+
+cat <<EOF > config/initializers/constants.php
+<?php
+
+define('ROOT', dirname(__FILE__, 3));
+define('VIEWS', ROOT . '/app/views/');
+define('EXTENSION_VIEW', '.html');
+
+// Configurações de banco de dados
+define('DB_DRIVER', \$_ENV['DB_DRIVER']);
+define('DB_HOST', \$_ENV['DB_HOST']);
+define('DB_PORT', \$_ENV['DB_PORT']);
+define('DB_DATABASE', \$_ENV['DB_DATABASE']);
+define('DB_USERNAME', \$_ENV['DB_USERNAME']);
+define('DB_PASSWORD', \$_ENV['DB_PASSWORD']);
+define('DB_CHARSET', \$_ENV['DB_CHARSET']);
+
 EOF
 
 # Cria o arquivo public/index.php que define a rota inicial
 cat <<EOF > public/index.php
 <?php
+
 require "../init.php";
+
 \$app->run();
+
 EOF
 
 # Cria o arquivo config/routes.php com uma rota de exemplo
 cat <<EOF > config/routes.php
 <?php
-// Home
-\$app->get('/', function (\$request, \$response, \$args) {
-  \$response->getBody()->write("Home");
-  return \$response;
-});
+
+use App\\Controllers\\HomeController;
+
+\$app->get('/', HomeController::class . ':index');
+
 EOF
 
 # Cria o arquivo phpunit.xml na raiz do projeto
 cat <<EOF > phpunit.xml
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit bootstrap="vendor/autoload.php"
-         colors="true">
-    <testsuites>
-        <testsuite name="Application Test Suite">
-            <directory suffix=".php">test</directory>
-        </testsuite>
-    </testsuites>
+<phpunit bootstrap="vendor/autoload.php" colors="true">
+    <testssuites>
+        <testssuite name="Application tests Suite">
+            <directory suffix=".php">tests</directory>
+        </testssuite>
+    </testssuites>
     <filter>
         <whitelist>
             <directory suffix=".php">app</directory>
@@ -101,9 +213,84 @@ cat <<EOF > phpunit.xml
 </phpunit>
 EOF
 
+cat <<EOF > tests/init.php
+<?php
+
+\/*
+\ * Path: test/init.php
+\ * Load files for testing
+\ */
+require 'vendor/autoload.php';
+require 'init.php';
+EOF
+
+cat <<EOF > app/controllers/traits/Views.php
+<?php
+
+namespace App\\Controllers\\Traits;
+
+use Exception;
+use Slim\\Views\\Twig;
+
+trait Views
+{
+    public function getTemplateEngine()
+    {
+        try {
+            return Twig::create(VIEWS, \$this->setCache());
+        } catch (Exception \$e) {
+            var_dump(\$e->getMessage());
+            return null;
+        }
+    }
+
+    public function setTemplateView()
+    {
+        \$trace = debug_backtrace();
+        \$caller = \$trace[1];
+
+        \$className = strtolower(str_replace('Controller', '', basename(str_replace('\\\\', '/', \$caller['class']))));
+        \$methodName = strtolower(\$caller['function']);
+
+        \$filename = \$className . '/' . \$methodName;
+
+        return \$filename . EXTENSION_VIEW;
+    }
+
+    public function setCache()
+    {
+        // Define uma configuração padrão desabilitando o cache
+        \$templateSettings = ['cache' => false];
+
+        // Ativa o cache somente no ambiente de produção
+        if (\$_ENV['APP_ENV'] === 'production') {
+            // Verifica se um caminho personalizado de cache foi especificado
+            \$cachePath = \$_ENV['CACHE_PATH'] ?? 'tmp/cache';
+            \$templateSettings['cache'] = \$cachePath;
+        }
+
+        return \$templateSettings;
+    }
+}
+EOF
+
+cat <<EOF > app/controllers/ApplicationController.php
+
+<?php
+
+namespace App\\Controllers;
+
+abstract class ApplicationController
+{
+    use Traits\\Views;
+}
+EOF
+
 # Instala as dependências e cria o autoload.php na pasta vendor
 composer install
-composer dump-autoload -o
 
-# Executa o primeiro teste com a migração
+# Executa o primeiro teste, criando a migração
 ./vendor/bin/phpunit --migrate-configuration
+
+# Copia o arquivo .env.example para .env se ainda não existir
+[ -f .env ] || cp .env.example .env
