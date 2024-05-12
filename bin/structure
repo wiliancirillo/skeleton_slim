@@ -8,8 +8,8 @@ mkdir -p app/models/traits
 mkdir -p config/{environments,initializers,locales} db lib log public tests/{controllers,models,integration,fixtures} tmp/cache
 mkdir -p db/{migrations,seeds}
 
-# Adiciona arquivos .keep em todos os diretórios relevantes que estão vazios
-find app db/{migrations,seeds} config lib log tests tmp/cache app/views/shared -type d \( ! -path 'app' -a ! -path 'app/*/*' -a ! -path 'tests' -a ! -path 'tests/*/*' -a ! -path 'app/controllers/*/*' -a ! -path 'config/initializers/*/*' -a ! -path 'config' \) -exec bash -c 'shopt -s nullglob; files=("$1"/*); dirs=("$1"/*/); [[ ${#files[@]} -eq 0 && ${#dirs[@]} -eq 0 ]] && touch "$1/.keep"' bash {} \;
+# Adiciona arquivos .keep em todos os diretórios relevantes que estão vazios, exceto config/initializers
+find app db/{migrations,seeds} config lib log tests tmp/cache app/views/shared -type d \( ! -path 'app' -a ! -path 'app/*/*' -a ! -path 'tests' -a ! -path 'tests/*/*' -a ! -path 'app/controllers/*/*' -a ! -path 'config/initializers' -a ! -path 'config' \) -exec bash -c 'shopt -s nullglob; files=("$1"/*); dirs=("$1"/*/); [[ ${#files[@]} -eq 0 && ${#dirs[@]} -eq 0 || "$1" == "app/models/traits" || "$1" == "app/views/shared" ]] && touch "$1/.keep"' bash {} \;
 
 # Cria o arquivo composer.json na raiz do projeto
 cat <<EOF > composer.json
