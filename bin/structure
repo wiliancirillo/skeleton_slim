@@ -8,8 +8,8 @@ mkdir -p app/models/traits
 mkdir -p config/{environments,initializers,locales} db lib log public tests/{controllers,models,integration,fixtures} tmp/cache
 mkdir -p db/{migrations,seeds}
 
-# Adiciona arquivos .keep em todos os diretórios relevantes
-find app db/{migrations,seeds} config lib log tests tmp/cache app/views/shared -type d \( ! -path 'app/controllers/*' and ! -name 'config/initializers' and ! -name 'config' and ! -name 'app' and ! -name 'app/views/*' and ! -name 'tests' \) -exec touch {}/.keep \;
+# Adiciona arquivos .keep em todos os diretórios relevantes que estão vazios
+find app db/{migrations,seeds} config lib log tests tmp/cache app/views/shared -type d \( ! -path 'app' -a ! -path 'app/*/*' -a ! -path 'tests' -a ! -path 'tests/*/*' -a ! -path 'app/controllers/*/*' -a ! -path 'config/initializers/*/*' -a ! -path 'config' \) -exec bash -c 'shopt -s nullglob; files=("$1"/*); dirs=("$1"/*/); [[ ${#files[@]} -eq 0 && ${#dirs[@]} -eq 0 ]] && touch "$1/.keep"' bash {} \;
 
 # Cria o arquivo composer.json na raiz do projeto
 cat <<EOF > composer.json
@@ -102,11 +102,6 @@ EOF
 # Cria o arquivo init.php para configurar o Slim App
 cat <<EOF > init.php
 <?php
-
-/*
-\ * Path: /init.php
-\ * Boostrap of the project
-\ */
 
 use Slim\\Factory\\AppFactory;
 use Illuminate\\Database\\Capsule\\Manager as Capsule;
@@ -216,10 +211,6 @@ EOF
 cat <<EOF > tests/init.php
 <?php
 
-\/*
-\ * Path: tests/init.php
-\ * Load files for testing
-\ */
 require 'vendor/autoload.php';
 require 'init.php';
 EOF
@@ -293,3 +284,6 @@ composer install
 
 # Copia o arquivo .env.example para .env se ainda não existir
 [ -f .env ] || cp .env.example .env
+
+# Executa o fix para os arquivos
+php-cs-fixer fix .
