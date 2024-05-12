@@ -9,7 +9,7 @@ mkdir -p config/{environments,initializers,locales} db lib log public tests/{con
 mkdir -p db/{migrations,seeds}
 
 # Adiciona arquivos .keep em todos os diretórios relevantes
-find app db/{migrations,seeds} lib log tests tmp/cache app/views/shared -type d \( ! -path 'app/controllers/*' -and ! -name 'controllers' \) -exec touch {}/.keep \;
+find app db/{migrations,seeds} config lib log tests tmp/cache app/views/shared -type d \( ! -path 'app/controllers/*' and ! -name 'config/initializers' and ! -name 'config' and ! -name 'app' and ! -name 'app/views/*' and ! -name 'tests' \) -exec touch {}/.keep \;
 
 # Cria o arquivo composer.json na raiz do projeto
 cat <<EOF > composer.json
@@ -217,7 +217,7 @@ cat <<EOF > tests/init.php
 <?php
 
 \/*
-\ * Path: test/init.php
+\ * Path: tests/init.php
 \ * Load files for testing
 \ */
 require 'vendor/autoload.php';
