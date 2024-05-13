@@ -104,7 +104,7 @@ cat <<EOF > init.php
 <?php
 
 use Slim\\Factory\\AppFactory;
-use Illuminate\\Database\\Capsule\\Manager as Capsule;
+//use Illuminate\\Database\\Capsule\\Manager as Capsule;
 
 require 'vendor/autoload.php';
 
