@@ -16,7 +16,7 @@ echo "Criando diretórios..."
 mkdir -p app/{models,controllers,helpers,mailers,jobs}
 mkdir -p app/controllers/traits
 mkdir -p app/models/traits
-mkdir -p config/{environments,initializers,locales} db lib log public tests/{controllers,models,integration,fixtures} tmp/cache
+mkdir -p config/{environments,initializers,locales} db lib log public tests/{Feature,Unit} tmp/cache
 mkdir -p db/{migrations,seeds}
 mkdir -p .vscode
 
@@ -240,9 +240,14 @@ namespace Tests;
 use Slim\\App;
 use Slim\\Factory\\AppFactory;
 use PHPUnit\\Framework\\TestCase as BaseTestCase;
+use Slim\\Psr7\\Factory\\ServerRequestFactory;
+use Slim\\Psr7\\Environment;
+use Slim\\Psr7\\Factory\\UriFactory;
 
 class TestCase extends BaseTestCase
 {
+    protected \$app;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -258,23 +263,72 @@ class TestCase extends BaseTestCase
     public function get(\$uri)
     {
         \$request = \$this->createRequest('GET', \$uri);
-        return \$this->handleRequest(\$request);
+        return \$this->handleRequest($request);
     }
 
     protected function createRequest(\$method, \$uri)
     {
-        \$env = \Slim\\Http\\Environment::mock([
+        \$environment = Environment::mock([
             'REQUEST_METHOD' => \$method,
             'REQUEST_URI' => \$uri,
         ]);
 
-        return \Slim\\Http\\Request::createFromEnvironment(\$env);
+        \$uriFactory = new UriFactory();
+        \$uri = \$uriFactory->createUri(\$environment['REQUEST_URI']);
+
+        return (new ServerRequestFactory())->createServerRequest(\$method, \$uri, \$environment);
     }
 
     protected function handleRequest(\$request)
     {
         \$response = \$this->app->handle(\$request);
-        return new \Pest\\PestResponse(\$response);
+        return new PestResponse(\$response);
+    }
+}
+EOF
+
+# Cria o arquivo PestResponse.php
+echo "Criando arquivo PestResponse.php..."
+cat <<EOF > tests/PestResponse.php
+<?php
+
+namespace Tests;
+
+use Psr\\Http\\Message\\ResponseInterface;
+
+class PestResponse
+{
+    protected \$response;
+
+    public function __construct(ResponseInterface \$response)
+    {
+        \$this->response = \$response;
+    }
+
+    public function assertStatus(\$status)
+    {
+        if (\$this->response->getStatusCode() !== \$status) {
+            throw new \Exception("Expected status code \$status but received " . \$this->response->getStatusCode());
+        }
+
+        return \$this;
+    }
+
+    public function assertJson(array \$data)
+    {
+        \$responseData = json_decode((string) \$this->response->getBody(), true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception("Response is not a valid JSON");
+        }
+
+        foreach (\$data as \$key => \$value) {
+            if (!array_key_exists(\$key, \$responseData) || \$responseData[\$key] !== \$value) {
+                throw new \Exception("Expected JSON key \$key with value \$value but received " . (\$responseData[\$key] ?? 'null'));
+            }
+        }
+
+        return \$this;
     }
 }
 EOF
