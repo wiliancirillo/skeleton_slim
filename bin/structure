@@ -18,6 +18,7 @@ mkdir -p app/controllers/traits
 mkdir -p app/models/traits
 mkdir -p config/{environments,initializers,locales} db lib log public tests/{controllers,models,integration,fixtures} tmp/cache
 mkdir -p db/{migrations,seeds}
+mkdir -p .vscode
 
 # Adiciona arquivos .keep em todos os diretórios relevantes que estão vazios
 echo "Adicionando arquivos .keep..."
@@ -310,6 +311,20 @@ require_once 'vendor/autoload.php';
 \$entityManager = EntityManager::create(\$conn, \$config);
 
 return ConsoleRunner::createHelperSet(\$entityManager);
+EOF
+
+# Cria o arquivo settings.json para o PHP CS Fixer no VSCode
+echo "Criando arquivo settings.json..."
+cat <<EOF > .vscode/settings.json
+{
+    "php-cs-fixer.executablePath": "php-cs-fixer",
+    "php-cs-fixer.rules": "@PSR2",
+    "php-cs-fixer.config": ".php-cs-fixer.php",
+    "editor.formatOnSave": true,
+    "[php]": {
+        "editor.defaultFormatter": "junstyle.php-cs-fixer"
+    }
+}
 EOF
 
 # Instala as dependências e cria o autoload.php na pasta vendor

@@ -1,4 +1,0 @@
-{
-  "php-cs-fixer.executablePath": "/usr/local/bin/php-cs-fixer",
-  "php-cs-fixer.onsave": true
-}
