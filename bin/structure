@@ -34,7 +34,8 @@ cat <<EOF > composer.json
     "vlucas/phpdotenv": "^5.6",
     "doctrine/orm": "^2.11",
     "doctrine/migrations": "^3.0",
-    "php-di/php-di": "^6.3"
+    "php-di/php-di": "^6.3",
+    "symfony/cache": "^5.3"
   },
   "autoload": {
     "psr-4": {
@@ -108,15 +109,16 @@ echo "Criando arquivo init.php..."
 cat <<EOF > init.php
 <?php
 
-use DI\\Container;
-use Slim\\Factory\\AppFactory;
-use Doctrine\\ORM\\Tools\\Setup;
-use Doctrine\\ORM\\EntityManager;
+use DI\Container;
+use Slim\Factory\AppFactory;
+use Doctrine\ORM\ORMSetup;
+use Doctrine\ORM\EntityManager;
+use Doctrine\DBAL\DriverManager;
 
 require 'vendor/autoload.php';
 
 // Carregar variáveis de ambiente
-\$dotenv = Dotenv\\Dotenv::createImmutable(__DIR__);
+\$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
 \$dotenv->load();
 
 // Configurar o Container
@@ -128,16 +130,14 @@ AppFactory::setContainer(\$container);
 
 // Configurar o Doctrine ORM
 \$isDevMode = true;
-\$config = Setup::createAnnotationMetadataConfiguration([__DIR__ . "/app/models"], \$isDevMode);
-\$conn = [
-    'dbname' => \$_ENV['DB_DATABASE'],
-    'user' => \$_ENV['DB_USERNAME'],
-    'password' => \$_ENV['DB_PASSWORD'],
-    'host' => \$_ENV['DB_HOST'],
-    'driver' => \$_ENV['DB_DRIVER'],
-];
+\$config = ORMSetup::createAttributeMetadataConfiguration([__DIR__ . '/app/models'], \$isDevMode);
 
-\$entityManager = EntityManager::create(\$conn, \$config);
+// Carregar configurações de conexão do arquivo database.php
+\$dbParams = require __DIR__ . '/config/database.php';
+
+// Cria a conexão usando o DriverManager e o EntityManager com a configuração
+\$connection = DriverManager::getConnection(\$dbParams, \$config);
+\$entityManager = EntityManager::create(\$connection, \$config);
 
 // Adiciona EntityManager ao contêiner do Slim
 \$container->set('EntityManager', \$entityManager);
@@ -299,16 +299,10 @@ require_once 'vendor/autoload.php';
 \$dotenv = Dotenv::createImmutable(__DIR__);
 \$dotenv->load();
 
-\$config = Setup::createAnnotationMetadataConfiguration([__DIR__ . "/app/models"], true);
-\$conn = [
-    'dbname' => \$_ENV['DB_DATABASE'],
-    'user' => \$_ENV['DB_USERNAME'],
-    'password' => \$_ENV['DB_PASSWORD'],
-    'host' => \$_ENV['DB_HOST'],
-    'driver' => \$_ENV['DB_DRIVER'],
-];
+\$config = ORMSetup::createAttributeMetadataConfiguration([__DIR__ . "/app/models"], true);
+\$dbParams = require __DIR__ . '/config/database.php';
 
-\$entityManager = EntityManager::create(\$conn, \$config);
+\$entityManager = EntityManager::create(DriverManager::getConnection(\$dbParams, \$config), \$config);
 
 return ConsoleRunner::createHelperSet(\$entityManager);
 EOF
