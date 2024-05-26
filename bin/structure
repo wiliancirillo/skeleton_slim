@@ -1,31 +1,45 @@
 #!/bin/bash
 
+# Função para verificar a instalação do Composer
+check_composer_installed() {
+    if ! command -v composer &> /dev/null; then
+        echo "Composer não está instalado. Por favor, instale o Composer antes de continuar."
+        exit 1
+    fi
+}
+
+# Verifica se o Composer está instalado
+check_composer_installed
+
 # Cria os diretórios principais
+echo "Criando diretórios..."
 mkdir -p app/{models,controllers,helpers,mailers,jobs}
-mkdir -p app/views/{home,layouts,shared}
 mkdir -p app/controllers/traits
 mkdir -p app/models/traits
 mkdir -p config/{environments,initializers,locales} db lib log public tests/{controllers,models,integration,fixtures} tmp/cache
 mkdir -p db/{migrations,seeds}
 
-# Adiciona arquivos .keep em todos os diretórios relevantes que estão vazios, exceto config/initializers
-find app db/{migrations,seeds} config lib log tests tmp/cache app/views/shared -type d \( ! -path 'app' -a ! -path 'app/*/*' -a ! -path 'tests' -a ! -path 'tests/*/*' -a ! -path 'app/controllers/*/*' -a ! -path 'config/initializers' -a ! -path 'config' \) -exec bash -c 'shopt -s nullglob; files=("$1"/*); dirs=("$1"/*/); [[ ${#files[@]} -eq 0 && ${#dirs[@]} -eq 0 || "$1" == "app/models/traits" || "$1" == "app/views/shared" ]] && touch "$1/.keep"' bash {} \;
+# Adiciona arquivos .keep em todos os diretórios relevantes que estão vazios
+echo "Adicionando arquivos .keep..."
+find app db/{migrations,seeds} config lib log tests tmp/cache -type d -exec bash -c '[[ -z $(ls -A "$1") ]] && touch "$1/.keep"' _ {} \;
 
 # Cria o arquivo composer.json na raiz do projeto
+echo "Criando arquivo composer.json..."
 cat <<EOF > composer.json
 {
   "require": {
     "slim/slim": "^4.0",
-    "slim/twig-view": "^3.4",
     "slim/psr7": "^1.6",
-    "vlucas/phpdotenv": "^5.6"
+    "vlucas/phpdotenv": "^5.6",
+    "doctrine/orm": "^2.11",
+    "doctrine/migrations": "^3.0",
+    "php-di/php-di": "^6.3"
   },
   "autoload": {
     "psr-4": {
       "App\\\\": "app/",
       "App\\\\Models\\\\": "app/models/",
       "App\\\\Controllers\\\\": "app/controllers/",
-      "App\\\\Views\\\\": "app/views/",
       "App\\\\Helpers\\\\": "app/helpers/",
       "App\\\\Mailers\\\\": "app/mailers/",
       "App\\\\Jobs\\\\": "app/jobs/",
@@ -35,7 +49,7 @@ cat <<EOF > composer.json
   },
   "autoload-dev": {
     "psr-4": {
-      "tests\\\\": "tests/"
+      "Tests\\\\": "tests/"
     }
   },
   "config": {
@@ -50,61 +64,53 @@ cat <<EOF > composer.json
     ]
   },
   "require-dev": {
-    "phpunit/phpunit": "^11.1"
+    "pestphp/pest": "^1.22",
+    "nunomaduro/collision": "^5.0",
+    "friendsofphp/php-cs-fixer": "^3.0"
   }
 }
 EOF
 
-cat <<EOF > app/controllers/HomeController.php
+# Cria o arquivo WelcomeController.php
+echo "Criando arquivo WelcomeController.php..."
+cat <<EOF > app/controllers/WelcomeController.php
 <?php
 
 namespace App\\Controllers;
 
-class HomeController extends ApplicationController
+use Psr\\Container\\ContainerInterface;
+
+class WelcomeController extends ApplicationController
 {
+    private \$container;
+
+    public function __construct(ContainerInterface \$container)
+    {
+        \$this->container = \$container;
+    }
+
     public function index(\$request, \$response, \$args)
     {
-        return \$this->getTemplateEngine()->render(
-            \$response,
-            \$this->setTemplateView(),
-            [
-                'site_title' => 'Base Structure'
-            ]
-        );
+        \$entityManager = \$this->container->get('EntityManager');
+        // Use o EntityManager conforme necessário
+
+        \$response->getBody()->write(json_encode([
+            'message' => 'API Structure with Slim Framework 4'
+        ]));
+        return \$response->withHeader('Content-Type', 'application/json');
     }
 }
 EOF
 
-cat <<EOF > app/views/home/index.html
-{% extends "layouts/application.html" %}
-
-{% block content %}
-Conteúdo aqui!
-{% endblock %}
-EOF
-
-cat <<EOF > app/views/layouts/application.html
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{ site_title }}</title>
-  </head>
-  <body>
-    {% block content %}{% endblock %}
-  </body>
-</html>
-EOF
-
-
-
 # Cria o arquivo init.php para configurar o Slim App
+echo "Criando arquivo init.php..."
 cat <<EOF > init.php
 <?php
 
+use DI\\Container;
 use Slim\\Factory\\AppFactory;
-//use Illuminate\\Database\\Capsule\\Manager as Capsule;
+use Doctrine\\ORM\\Tools\\Setup;
+use Doctrine\\ORM\\EntityManager;
 
 require 'vendor/autoload.php';
 
@@ -112,9 +118,28 @@ require 'vendor/autoload.php';
 \$dotenv = Dotenv\\Dotenv::createImmutable(__DIR__);
 \$dotenv->load();
 
+// Configurar o Container
+\$container = new Container();
+AppFactory::setContainer(\$container);
+
 \$app = AppFactory::create();
-// Add Error Handling Middleware
 \$app->addErrorMiddleware(true, true, true);
+
+// Configurar o Doctrine ORM
+\$isDevMode = true;
+\$config = Setup::createAnnotationMetadataConfiguration([__DIR__ . "/app/models"], \$isDevMode);
+\$conn = [
+    'dbname' => \$_ENV['DB_DATABASE'],
+    'user' => \$_ENV['DB_USERNAME'],
+    'password' => \$_ENV['DB_PASSWORD'],
+    'host' => \$_ENV['DB_HOST'],
+    'driver' => \$_ENV['DB_DRIVER'],
+];
+
+\$entityManager = EntityManager::create(\$conn, \$config);
+
+// Adiciona EntityManager ao contêiner do Slim
+\$container->set('EntityManager', \$entityManager);
 
 // Carrega todos os arquivos de inicialização
 \$initializersPath = __DIR__ . '/config/initializers/';
@@ -127,38 +152,31 @@ if (is_dir(\$initializersPath)) {
     }
 }
 
-// Inicia o Eloquent ORM
-\$config = require 'config/database.php';
-//\$capsule = new Capsule();
-//\$capsule->addConnection(\$config);
-//\$capsule->setAsGlobal();
-//\$capsule->bootEloquent();
-
 // Carrega as rotas
 require 'config/routes.php';
 EOF
 
+# Cria o arquivo config/database.php
+echo "Criando arquivo database.php..."
 cat <<EOF > config/database.php
 <?php
 
 return [
-    'driver' => DB_DRIVER,
-    'host' => DB_HOST,
-    'database' => DB_DATABASE,
-    'username' => DB_USERNAME,
-    'password' => DB_PASSWORD,
-    'charset' => DB_CHARSET,
-    'collation' => 'utf8_unicode_ci',
-    'prefix' => '',
+    'driver' => 'pdo_mysql',
+    'host' => \$_ENV['DB_HOST'],
+    'dbname' => \$_ENV['DB_DATABASE'],
+    'user' => \$_ENV['DB_USERNAME'],
+    'password' => \$_ENV['DB_PASSWORD'],
+    'charset' => 'utf8',
 ];
 EOF
 
+# Cria o arquivo config/initializers/constants.php
+echo "Criando arquivo constants.php..."
 cat <<EOF > config/initializers/constants.php
 <?php
 
 define('ROOT', dirname(__FILE__, 3));
-define('VIEWS', ROOT . '/app/views/');
-define('EXTENSION_VIEW', '.html');
 
 // Configurações de banco de dados
 define('DB_DRIVER', \$_ENV['DB_DRIVER']);
@@ -172,6 +190,7 @@ define('DB_CHARSET', \$_ENV['DB_CHARSET']);
 EOF
 
 # Cria o arquivo public/index.php que define a rota inicial
+echo "Criando arquivo public/index.php..."
 cat <<EOF > public/index.php
 <?php
 
@@ -182,108 +201,126 @@ require "../init.php";
 EOF
 
 # Cria o arquivo config/routes.php com uma rota de exemplo
+echo "Criando arquivo routes.php..."
 cat <<EOF > config/routes.php
 <?php
 
-use App\\Controllers\\HomeController;
+use App\\Controllers\\WelcomeController;
 
-\$app->get('/', HomeController::class . ':index');
+\$app->get('/', WelcomeController::class . ':index');
 
 EOF
 
-# Cria o arquivo phpunit.xml na raiz do projeto
-cat <<EOF > phpunit.xml
-<?xml version="1.0" encoding="UTF-8"?>
-<phpunit bootstrap="vendor/autoload.php" colors="true">
-    <testssuites>
-        <testssuite name="Application tests Suite">
-            <directory suffix=".php">tests</directory>
-        </testssuite>
-    </testssuites>
-    <filter>
-        <whitelist>
-            <directory suffix=".php">app</directory>
-        </whitelist>
-    </filter>
-</phpunit>
-EOF
-
-cat <<EOF > tests/init.php
+# Cria o arquivo pest.php na raiz do projeto
+echo "Criando arquivo pest.php..."
+cat <<EOF > pest.php
 <?php
 
-require 'vendor/autoload.php';
-require 'init.php';
+uses(Tests\\TestCase::class)->in('Feature', 'Unit');
+
 EOF
 
-cat <<EOF > app/controllers/traits/Views.php
+# Cria o arquivo de teste para WelcomeController
+echo "Criando arquivo WelcomeControllerTest.php..."
+cat <<EOF > tests/Feature/WelcomeControllerTest.php
 <?php
 
-namespace App\\Controllers\\Traits;
+test('home route returns a JSON response', function () {
+    \$response = \$this->get('/');
+    \$response->assertStatus(200)
+              ->assertJson([
+                  'message' => 'API Structure with Slim Framework 4',
+              ]);
+});
+EOF
 
-use Exception;
-use Slim\\Views\\Twig;
+# Cria o arquivo TestCase.php
+echo "Criando arquivo TestCase.php..."
+cat <<EOF > tests/TestCase.php
+<?php
 
-trait Views
+namespace Tests;
+
+use Slim\\App;
+use Slim\\Factory\\AppFactory;
+use PHPUnit\\Framework\\TestCase as BaseTestCase;
+
+class TestCase extends BaseTestCase
 {
-    public function getTemplateEngine()
+    protected function setUp(): void
     {
-        try {
-            return Twig::create(VIEWS, \$this->setCache());
-        } catch (Exception \$e) {
-            var_dump(\$e->getMessage());
-            return null;
-        }
+        parent::setUp();
+        \$this->app = \$this->createApp();
     }
 
-    public function setTemplateView()
+    protected function createApp(): App
     {
-        \$trace = debug_backtrace();
-        \$caller = \$trace[1];
-
-        \$className = strtolower(str_replace('Controller', '', basename(str_replace('\\\\', '/', \$caller['class']))));
-        \$methodName = strtolower(\$caller['function']);
-
-        \$filename = \$className . '/' . \$methodName;
-
-        return \$filename . EXTENSION_VIEW;
+        require __DIR__ . '/../init.php';
+        return \$app;
     }
 
-    public function setCache()
+    public function get(\$uri)
     {
-        // Define uma configuração padrão desabilitando o cache
-        \$templateSettings = ['cache' => false];
+        \$request = \$this->createRequest('GET', \$uri);
+        return \$this->handleRequest(\$request);
+    }
 
-        // Ativa o cache somente no ambiente de produção
-        if (\$_ENV['APP_ENV'] === 'production') {
-            // Verifica se um caminho personalizado de cache foi especificado
-            \$cachePath = \$_ENV['CACHE_PATH'] ?? 'tmp/cache';
-            \$templateSettings['cache'] = \$cachePath;
-        }
+    protected function createRequest(\$method, \$uri)
+    {
+        \$env = \Slim\\Http\\Environment::mock([
+            'REQUEST_METHOD' => \$method,
+            'REQUEST_URI' => \$uri,
+        ]);
 
-        return \$templateSettings;
+        return \Slim\\Http\\Request::createFromEnvironment(\$env);
+    }
+
+    protected function handleRequest(\$request)
+    {
+        \$response = \$this->app->handle(\$request);
+        return new \Pest\\PestResponse(\$response);
     }
 }
 EOF
 
-cat <<EOF > app/controllers/ApplicationController.php
+# Cria o arquivo cli-config.php para o Doctrine CLI
+echo "Criando arquivo cli-config.php..."
+cat <<EOF > cli-config.php
 <?php
 
-namespace App\\Controllers;
+use Doctrine\\ORM\\Tools\\Console\\ConsoleRunner;
+use Doctrine\\ORM\\EntityManager;
+use Dotenv\\Dotenv;
 
-abstract class ApplicationController
-{
-    use Traits\\Views;
-}
+require_once 'vendor/autoload.php';
+
+// Carregar variáveis de ambiente
+\$dotenv = Dotenv::createImmutable(__DIR__);
+\$dotenv->load();
+
+\$config = Setup::createAnnotationMetadataConfiguration([__DIR__ . "/app/models"], true);
+\$conn = [
+    'dbname' => \$_ENV['DB_DATABASE'],
+    'user' => \$_ENV['DB_USERNAME'],
+    'password' => \$_ENV['DB_PASSWORD'],
+    'host' => \$_ENV['DB_HOST'],
+    'driver' => \$_ENV['DB_DRIVER'],
+];
+
+\$entityManager = EntityManager::create(\$conn, \$config);
+
+return ConsoleRunner::createHelperSet(\$entityManager);
 EOF
 
 # Instala as dependências e cria o autoload.php na pasta vendor
+echo "Instalando dependências do Composer..."
 composer install
-
-# Executa o primeiro teste, criando a migração
-./vendor/bin/phpunit --migrate-configuration
 
 # Copia o arquivo .env.example para .env se ainda não existir
 [ -f .env ] || cp .env.example .env
 
 # Executa o fix para os arquivos
+echo "Executando php-cs-fixer..."
 php-cs-fixer fix .
+
+echo "Estrutura do projeto criada com sucesso!"
