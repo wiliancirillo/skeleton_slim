@@ -73,6 +73,19 @@ cat <<EOF > composer.json
 }
 EOF
 
+# Cria o arquivo ApplicationController.php
+echo "Criando arquivo ApplicationController.php..."
+cat <<EOF > app/controllers/ApplicationController.php
+<?php
+
+namespace App\\Controllers;
+
+class ApplicationController
+{
+    // Este é um controlador base que outros controladores podem estender
+}
+EOF
+
 # Cria o arquivo WelcomeController.php
 echo "Criando arquivo WelcomeController.php..."
 cat <<EOF > app/controllers/WelcomeController.php
@@ -163,31 +176,13 @@ cat <<EOF > config/database.php
 <?php
 
 return [
-    'driver' => 'pdo_mysql',
+    'driver' => \$_ENV['DB_DRIVER'],
     'host' => \$_ENV['DB_HOST'],
     'dbname' => \$_ENV['DB_DATABASE'],
     'user' => \$_ENV['DB_USERNAME'],
     'password' => \$_ENV['DB_PASSWORD'],
     'charset' => 'utf8',
 ];
-EOF
-
-# Cria o arquivo config/initializers/constants.php
-echo "Criando arquivo constants.php..."
-cat <<EOF > config/initializers/constants.php
-<?php
-
-define('ROOT', dirname(__FILE__, 3));
-
-// Configurações de banco de dados
-define('DB_DRIVER', \$_ENV['DB_DRIVER']);
-define('DB_HOST', \$_ENV['DB_HOST']);
-define('DB_PORT', \$_ENV['DB_PORT']);
-define('DB_DATABASE', \$_ENV['DB_DATABASE']);
-define('DB_USERNAME', \$_ENV['DB_USERNAME']);
-define('DB_PASSWORD', \$_ENV['DB_PASSWORD']);
-define('DB_CHARSET', \$_ENV['DB_CHARSET']);
-
 EOF
 
 # Cria o arquivo public/index.php que define a rota inicial
