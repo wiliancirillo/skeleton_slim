@@ -181,7 +181,7 @@ return [
     'dbname' => \$_ENV['DB_DATABASE'],
     'user' => \$_ENV['DB_USERNAME'],
     'password' => \$_ENV['DB_PASSWORD'],
-    'charset' => 'utf8',
+    'charset' => \$_ENV['DB_CHARSET'] ? \$_ENV['DB_CHARSET'] : 'utf8',,
 ];
 EOF
 
@@ -221,12 +221,17 @@ echo "Criando arquivo WelcomeControllerTest.php..."
 cat <<EOF > tests/Feature/WelcomeControllerTest.php
 <?php
 
+use Tests\\TestCase;
+
+uses(TestCase::class);
+
 test('home route returns a JSON response', function () {
     \$response = \$this->get('/');
+
     \$response->assertStatus(200)
-              ->assertJson([
-                  'message' => 'API Structure with Slim Framework 4',
-              ]);
+             ->assertJson([
+                 'message' => 'API Structure with Slim Framework 4',
+             ]);
 });
 EOF
 
@@ -263,7 +268,7 @@ class TestCase extends BaseTestCase
     public function get(\$uri)
     {
         \$request = \$this->createRequest('GET', \$uri);
-        return \$this->handleRequest($request);
+        return \$this->handleRequest(\$request);
     }
 
     protected function createRequest(\$method, \$uri)
@@ -285,6 +290,7 @@ class TestCase extends BaseTestCase
         return new PestResponse(\$response);
     }
 }
+
 EOF
 
 # Cria o arquivo PestResponse.php
@@ -295,6 +301,7 @@ cat <<EOF > tests/PestResponse.php
 namespace Tests;
 
 use Psr\\Http\\Message\\ResponseInterface;
+use PHPUnit\\Framework\\Assert; // Importando o Assert do PHPUnit
 
 class PestResponse
 {
@@ -307,10 +314,7 @@ class PestResponse
 
     public function assertStatus(\$status)
     {
-        if (\$this->response->getStatusCode() !== \$status) {
-            throw new \Exception("Expected status code \$status but received " . \$this->response->getStatusCode());
-        }
-
+        Assert::assertSame(\$status, \$this->response->getStatusCode(), "Expected status code \$status but received " . \$this->response->getStatusCode());
         return \$this;
     }
 
@@ -323,12 +327,16 @@ class PestResponse
         }
 
         foreach (\$data as \$key => \$value) {
-            if (!array_key_exists(\$key, \$responseData) || \$responseData[\$key] !== \$value) {
-                throw new \Exception("Expected JSON key \$key with value \$value but received " . (\$responseData[\$key] ?? 'null'));
-            }
+            Assert::assertArrayHasKey(\$key, \$responseData, "Expected JSON key \$key is missing");
+            Assert::assertSame(\$value, \$responseData[\$key], "Expected JSON key \$key with value \$value but received " . (\$responseData[\$key] ?? 'null'));
         }
 
         return \$this;
+    }
+
+    public function getBody()
+    {
+        return \$this->response->getBody();
     }
 }
 EOF
@@ -354,6 +362,27 @@ require_once 'vendor/autoload.php';
 \$entityManager = EntityManager::create(DriverManager::getConnection(\$dbParams, \$config), \$config);
 
 return ConsoleRunner::createHelperSet(\$entityManager);
+EOF
+
+# Cria o arquivo phpunit.xml para configuração do PHPUnit
+echo "Criando arquivo phpunit.xml..."
+cat <<EOF > phpunit.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.0/phpunit.xsd" bootstrap="vendor/autoload.php" colors="true">
+    <testsuites>
+        <testsuite name="Application Test Suite">
+            <directory>./tests</directory>
+        </testsuite>
+    </testsuites>
+
+    <coverage processUncoveredFiles="true">
+        <include>
+            <directory suffix=".php">./app</directory>
+            <directory suffix=".php">./lib</directory>
+            <directory suffix=".php">./config</directory>
+        </include>
+    </coverage>
+</phpunit>
 EOF
 
 # Cria o arquivo settings.json para o PHP CS Fixer no VSCode
