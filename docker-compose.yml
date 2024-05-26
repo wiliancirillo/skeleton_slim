@@ -1,0 +1,54 @@
+name: project_name
+services:
+  db:
+    image: postgres:latest
+    container_name: db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: username
+      POSTGRES_PASSWORD: strong_password
+      POSTGRES_DB: project_name_devolopment
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: dbms
+    environment:
+      PGADMIN_DEFAULT_EMAIL: dev@username.dev
+      PGADMIN_DEFAULT_PASSWORD: username
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "9080:80"
+    depends_on:
+      - db
+    networks:
+      - backend
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: localmail
+    logging:
+      driver: "none"
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - backend
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - backend
+
+volumes:
+  postgres_data:
+
+networks:
+  backend:
+    driver: bridge
